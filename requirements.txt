@@ -1,0 +1,8 @@
+# VoiceBox TTS Requirements
+# Celery + Redis based asynchronous TTS queue system
+
+celery==5.6.2
+redis==7.0.1
+flower==2.0.1
+flask==3.1.2
+requests==2.32.3
