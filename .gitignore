@@ -41,3 +41,7 @@ celeryd@*.pid
 
 # Output
 *.wav
+
+# Logs
+logs/
+tmp/

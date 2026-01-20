@@ -2,12 +2,63 @@
 Flask API Server for VoiceBox TTS
 音声生成タスクの登録・結果取得用HTTPエンドポイント
 """
-from flask import Flask, request, jsonify
+import os
+import time
+from flask import Flask, request, jsonify, g, send_from_directory
 from celery.result import AsyncResult
 from celery_worker import app as celery_app
 from config import API_HOST, API_PORT
+from flasgger import Swagger
+import yaml
 
-api = Flask(__name__)
+# Import monitoring modules
+from logger import get_api_logger
+from metrics import get_metrics_collector, get_performance_monitor
+
+# Initialize logger and metrics
+api_logger = get_api_logger()
+metrics = get_metrics_collector()
+perf_monitor = get_performance_monitor()
+
+api = Flask(__name__, static_folder='static')
+
+# Load OpenAPI spec
+with open('openapi.yaml', 'r', encoding='utf-8') as f:
+    openapi_spec = yaml.safe_load(f)
+
+# Configure Swagger
+swagger_config = {
+    "headers": [],
+    "specs": [
+        {
+            "endpoint": 'spec',
+            "route": '/spec.json',
+            "rule_filter": lambda rule: True,
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/docs"
+}
+
+swagger = Swagger(api, config=swagger_config, template=openapi_spec)
+
+
+@api.before_request
+def before_request():
+    """リクエスト前処理"""
+    g.start_time = time.time()
+
+
+@api.after_request
+def after_request(response):
+    """レスポンス後処理"""
+    if hasattr(g, 'start_time'):
+        duration_ms = (time.time() - g.start_time) * 1000
+        api_logger.log_response(request.path, response.status_code, duration_ms)
+        perf_monitor.record_api_request(request.path, duration_ms)
+    return response
 
 
 @api.route('/health', methods=['GET'])
@@ -37,9 +88,12 @@ def create_tts_task():
             "status": "PENDING"
         }
     """
+    api_logger.log_request('/tts', 'POST')
+
     data = request.get_json()
 
     if not data or 'text' not in data:
+        api_logger.log_error('/tts', 'Missing required field: text')
         return jsonify({'error': 'Missing required field: text'}), 400
 
     text = data['text']
@@ -66,6 +120,8 @@ def get_tts_task(task_id: str):
             "result": { ... }
         }
     """
+    api_logger.log_request(f'/tts/{task_id}', 'GET')
+
     task = AsyncResult(task_id, app=celery_app)
 
     response = {
@@ -81,6 +137,7 @@ def get_tts_task(task_id: str):
         response['result'] = task.result
     else:  # FAILURE
         response['result'] = str(task.info)
+        api_logger.log_error(f'/tts/{task_id}', f'Task failed: {task.info}')
 
     return jsonify(response)
 
@@ -88,6 +145,8 @@ def get_tts_task(task_id: str):
 @api.route('/tasks', methods=['GET'])
 def list_tasks():
     """アクティブなタスク一覧"""
+    api_logger.log_request('/tasks', 'GET')
+
     inspect = celery_app.control.inspect()
     active = inspect.active()
     scheduled = inspect.scheduled()
@@ -101,6 +160,8 @@ def list_tasks():
 @api.route('/workers', methods=['GET'])
 def list_workers():
     """ワーカー一覧・状態"""
+    api_logger.log_request('/workers', 'GET')
+
     inspect = celery_app.control.inspect()
     stats = inspect.stats()
     registered = inspect.registered()
@@ -108,6 +169,28 @@ def list_workers():
     return jsonify({
         'stats': stats,
         'registered_tasks': registered
+    })
+
+
+@api.route('/metrics', methods=['GET'])
+def get_metrics():
+    """メトリクス取得"""
+    api_logger.log_request('/metrics', 'GET')
+
+    return jsonify({
+        'stats': metrics.get_stats(),
+        'recent_tasks': metrics.get_recent_tasks(limit=10)
+    })
+
+
+@api.route('/errors', methods=['GET'])
+def get_errors():
+    """エラーログ取得"""
+    api_logger.log_request('/errors', 'GET')
+
+    limit = request.args.get('limit', 10, type=int)
+    return jsonify({
+        'errors': perf_monitor.get_recent_errors(limit)
     })
 
 

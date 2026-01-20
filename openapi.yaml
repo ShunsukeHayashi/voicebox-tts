@@ -1,0 +1,399 @@
+openapi: 3.0.3
+info:
+  title: VoiceBox TTS API
+  description: |
+    VOICEVOX音声生成の非同期キューイングシステム API
+
+    ## 機能概要
+
+    - テキストから音声への変換 (TTS) タスクの非同期実行
+    - Celery + Redis によるキュー管理
+    - タスク状態の追跡・結果取得
+    - メトリクス・ログの監視
+
+    ## 認証
+
+    現在のところ認証は不要です。
+
+  version: 1.0.0
+  contact:
+    name: Shunsuke Hayashi
+    url: https://github.com/ShunsukeHayashi/voicebox-tts
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:5001
+    description: ローカル開発環境
+
+tags:
+  - name: Health
+    description: ヘルスチェック
+  - name: Tasks
+    description: タスク管理
+  - name: Monitoring
+    description: モニタリング・メトリクス
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: ヘルスチェック
+      description: APIサーバーとCelery Workerの状態を確認
+      operationId: getHealth
+      responses:
+        '200':
+          description: 正常動作
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: voicebox-tts-api
+                  celery:
+                    type: object
+                    description: Celery Workerの統計情報
+
+  /tts:
+    post:
+      tags: [Tasks]
+      summary: 音声生成タスク作成
+      description: |
+        テキストから音声を生成する非同期タスクを作成します。
+
+        ## 話者一覧
+
+        | ID | 名前 |
+        |----|------|
+        | 0 | 四国めたん (あまあま) |
+        | 1 | 四国めたん (ノーマル) |
+        | 2 | 四国めたん (セクシー) |
+        | 3 | ずんだもん (ノーマル) |
+        | 8 | 春日部つむぎ |
+      operationId: createTTSTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+              properties:
+                text:
+                  type: string
+                  description: 読み上げテキスト
+                  example: テストメッセージ
+                speaker:
+                  type: integer
+                  description: "話者ID (デフォルト: 1)"
+                  example: 1
+                  minimum: 0
+      responses:
+        '202':
+          description: タスク作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskCreated'
+        '400':
+          description: リクエストエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tts/{task_id}:
+    get:
+      tags: [Tasks]
+      summary: タスク状態取得
+      description: タスクの状態と結果を取得します
+      operationId: getTaskStatus
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: タスクID
+      responses:
+        '200':
+          description: タスク状態取得成功
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TaskPending'
+                  - $ref: '#/components/schemas/TaskProgress'
+                  - $ref: '#/components/schemas/TaskSuccess'
+                  - $ref: '#/components/schemas/TaskFailure'
+
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: アクティブタスク一覧
+      description: 現在実行中・スケジュール済みのタスク一覧を取得
+      operationId: listTasks
+      responses:
+        '200':
+          description: タスク一覧取得成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active:
+                    type: object
+                    description: 実行中のタスク
+                  scheduled:
+                    type: object
+                    description: スケジュール済みのタスク
+
+  /workers:
+    get:
+      tags: [Monitoring]
+      summary: ワーカー状態取得
+      description: Celery Workerの状態と統計情報を取得
+      operationId: listWorkers
+      responses:
+        '200':
+          description: ワーカー状態取得成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    type: object
+                    description: ワーカー統計情報
+                  registered_tasks:
+                    type: object
+                    description: 登録済みタスク一覧
+
+  /metrics:
+    get:
+      tags: [Monitoring]
+      summary: メトリクス取得
+      description: システムのメトリクスと統計情報を取得
+      operationId: getMetrics
+      responses:
+        '200':
+          description: メトリクス取得成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    $ref: '#/components/schemas/MetricsStats'
+                  recent_tasks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TaskMetric'
+
+  /errors:
+    get:
+      tags: [Monitoring]
+      summary: エラーログ取得
+      description: 最近のエラー一覧を取得
+      operationId: getErrors
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: 取得するエラー数
+      responses:
+        '200':
+          description: エラーログ取得成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ErrorEntry'
+
+components:
+  schemas:
+    TaskCreated:
+      type: object
+      properties:
+        task_id:
+          type: string
+          format: uuid
+          description: タスクID
+        status:
+          type: string
+          enum: [PENDING]
+          description: タスク状態
+
+    TaskPending:
+      type: object
+      required: [task_id, status]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING]
+        result:
+          type: string
+          nullable: true
+          example: null
+
+    TaskProgress:
+      type: object
+      required: [task_id, status]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PROGRESS]
+        result:
+          type: object
+          properties:
+            status:
+              type: string
+              example: Querying audio parameters
+
+    TaskSuccess:
+      type: object
+      required: [task_id, status]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [SUCCESS]
+        result:
+          type: object
+          required: [success, audio_path, speaker, text, file_size]
+          properties:
+            success:
+              type: boolean
+              example: true
+            audio_path:
+              type: string
+              description: 生成された音声ファイルのパス
+              example: /path/to/voicebox/task_xxx.wav
+            speaker:
+              type: integer
+              example: 1
+            text:
+              type: string
+              example: テストメッセージ
+            file_size:
+              type: integer
+              description: ファイルサイズ (bytes)
+              example: 123456
+
+    TaskFailure:
+      type: object
+      required: [task_id, status]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [FAILURE]
+        result:
+          type: string
+          description: エラーメッセージ
+
+    MetricsStats:
+      type: object
+      properties:
+        counters:
+          type: object
+          properties:
+            tasks_started:
+              type: integer
+            tasks_completed:
+              type: integer
+            tasks_failed:
+              type: integer
+        success_rate:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        duration_ms:
+          type: object
+          properties:
+            p50:
+              type: number
+              nullable: true
+            p95:
+              type: number
+              nullable: true
+            p99:
+              type: number
+              nullable: true
+        tasks_last_hour:
+          type: integer
+        active_tasks:
+          type: integer
+
+    TaskMetric:
+      type: object
+      properties:
+        task_id:
+          type: string
+        status:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        duration_ms:
+          type: number
+          nullable: true
+        file_size:
+          type: integer
+          nullable: true
+        speaker:
+          type: integer
+          nullable: true
+        text_length:
+          type: integer
+
+    ErrorEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          type: string
+          example: TaskError
+        message:
+          type: string
+        context:
+          type: object
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: エラーメッセージ

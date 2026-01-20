@@ -3,6 +3,8 @@ Celery Worker for VoiceBox TTS
 音声生成タスクを非同期実行するワーカー
 """
 import json
+import os
+import time
 import urllib.parse
 import urllib.request
 from celery import Celery
@@ -13,6 +15,15 @@ from config import (
     DEFAULT_SPEAKER,
     OUTPUT_DIR
 )
+
+# Import monitoring modules
+from logger import get_task_logger
+from metrics import get_metrics_collector, get_performance_monitor
+
+# Initialize logger and metrics
+task_logger = get_task_logger()
+metrics = get_metrics_collector()
+perf_monitor = get_performance_monitor()
 
 # Celery app initialization
 app = Celery(
@@ -34,7 +45,7 @@ app.conf.update(
 )
 
 
-@app.task(bind=True, name='voicebox.tts')
+@app.task(bind=True, name='voicebox.tts', acks_late=True)
 def tts_task(self, text: str, speaker: int = None):
     """
     VOICEVOX APIで音声生成を行うタスク
@@ -55,10 +66,17 @@ def tts_task(self, text: str, speaker: int = None):
     if speaker is None:
         speaker = DEFAULT_SPEAKER
 
+    task_id = self.request.id
+
+    # Log task start
+    task_logger.log_task_start(task_id, text, speaker)
+    metrics.task_start(task_id, text, speaker)
+
     self.update_state(state='PROGRESS', meta={'status': 'Initializing'})
 
     try:
         # Update task status
+        task_logger.log_task_progress(task_id, 'Querying audio parameters')
         self.update_state(state='PROGRESS', meta={'status': 'Querying audio parameters'})
 
         # audio_query API call
@@ -69,6 +87,7 @@ def tts_task(self, text: str, speaker: int = None):
             query = json.load(r)
 
         # Update task status
+        task_logger.log_task_progress(task_id, 'Synthesizing audio')
         self.update_state(state='PROGRESS', meta={'status': 'Synthesizing audio'})
 
         # synthesis API call
@@ -87,8 +106,11 @@ def tts_task(self, text: str, speaker: int = None):
                 f.write(r.read())
 
         # Get file size
-        import os
         file_size = os.path.getsize(output_path)
+
+        # Log task success
+        metrics.task_complete(task_id, file_size)
+        task_logger.log_task_success(task_id, file_size, 0)
 
         return {
             'success': True,
@@ -100,9 +122,20 @@ def tts_task(self, text: str, speaker: int = None):
         }
 
     except Exception as e:
+        error_msg = str(e)
+
+        # Log task failure
+        metrics.task_failure(task_id, error_msg)
+        task_logger.log_task_failure(task_id, error_msg)
+        perf_monitor.record_error('TaskError', error_msg, {
+            'task_id': task_id,
+            'speaker': speaker,
+            'text_length': len(text)
+        })
+
         return {
             'success': False,
-            'error': str(e),
+            'error': error_msg,
             'speaker': speaker,
             'text': text,
             'task_id': self.request.id
@@ -112,7 +145,17 @@ def tts_task(self, text: str, speaker: int = None):
 @app.task(name='voicebox.health')
 def health_check():
     """ヘルスチェックタスク"""
-    return {'status': 'ok', 'message': 'VoiceBox TTS worker is running'}
+    return {
+        'status': 'ok',
+        'message': 'VoiceBox TTS worker is running',
+        'metrics': metrics.get_stats()
+    }
+
+
+@app.task(name='voicebox.get_metrics')
+def get_metrics():
+    """メトリクス取得タスク"""
+    return metrics.get_stats()
 
 
 if __name__ == '__main__':

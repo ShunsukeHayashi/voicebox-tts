@@ -136,7 +136,26 @@ curl http://localhost:5001/health
 | サービス | URL |
 |---------|-----|
 | API Server | http://localhost:5001 |
+| API Documentation (Swagger UI) | http://localhost:5001/docs |
+| OpenAPI Spec | http://localhost:5001/spec.json |
 | Flower Dashboard | http://localhost:5555 |
+
+## モニタリング
+
+### ログファイル
+
+- `logs/tasks.jsonl` - タスク実行ログ (JSON Lines形式)
+- `logs/api.jsonl` - APIリクエストログ
+
+### メトリクスAPI
+
+```bash
+# システム統計取得
+curl http://localhost:5001/metrics
+
+# エラーログ取得
+curl http://localhost:5001/errors?limit=10
+```
 
 ## 話者一例
 
