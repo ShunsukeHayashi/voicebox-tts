@@ -24,7 +24,7 @@ VOICEBOX_DIR="$HOME/voicebox"
 # ポート設定
 API_PORT=5001
 FLOWER_PORT=5555
-CELERY_CONCURRENCY=10
+CELERY_CONCURRENCY=1  # 直列実行：音声同時再生を防止
 
 log_info "voicebox-tts システム起動中..."
 

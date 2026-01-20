@@ -21,3 +21,10 @@ API_PORT = int(os.getenv("API_PORT", "5000"))
 
 # Flower settings
 FLOWER_PORT = int(os.getenv("FLOWER_PORT", "5555"))
+
+# Auto-play settings
+AUTO_PLAY = os.getenv("AUTO_PLAY", "true").lower() == "true"
+AUTO_PLAY_COMMAND = os.getenv("AUTO_PLAY_COMMAND", "afplay")  # afplay, ffplay, etc.
+
+# Audio synthesis settings
+SPEED_SCALE = float(os.getenv("SPEED_SCALE", "1.3"))  # 1.0 = normal, 1.3 = faster

@@ -53,8 +53,8 @@ def before_request():
 
 @api.after_request
 def after_request(response):
-    """レスポンス後処理"""
-    if hasattr(g, 'start_time'):
+    """レスポンス後処理 (高速化: /ttsはログ省略)"""
+    if hasattr(g, 'start_time') and request.path != '/tts':
         duration_ms = (time.time() - g.start_time) * 1000
         api_logger.log_response(request.path, response.status_code, duration_ms)
         perf_monitor.record_api_request(request.path, duration_ms)
@@ -88,18 +88,15 @@ def create_tts_task():
             "status": "PENDING"
         }
     """
-    api_logger.log_request('/tts', 'POST')
-
     data = request.get_json()
 
     if not data or 'text' not in data:
-        api_logger.log_error('/tts', 'Missing required field: text')
         return jsonify({'error': 'Missing required field: text'}), 400
 
     text = data['text']
     speaker = data.get('speaker')
 
-    # タスクを非同期実行
+    # タスクを非同期実行 (高速化: ログ出力省略)
     task = celery_app.send_task('voicebox.tts', args=[text, speaker])
 
     return jsonify({
