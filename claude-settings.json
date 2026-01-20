@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "7a6d9ce00a9d4437977189093aaddde8.WPyatQazDGioVCti",
+    "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
+    "API_TIMEOUT_MS": 3000000,
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.5-air",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.7",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-4.7",
+    "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+    "N8N_API_URL": "http://localhost:5678",
+    "N8N_API_KEY": "${N8N_API_KEY}",
+    "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+    "SLACK_TEAM_ID": "${SLACK_TEAM_ID}",
+    "GOOGLE_APPLICATION_CREDENTIALS": "${GOOGLE_APPLICATION_CREDENTIALS}",
+    "GOOGLE_CLOUD_PROJECT": "${GOOGLE_CLOUD_PROJECT}",
+    "GOOGLE_API_KEY": "${GOOGLE_API_KEY}",
+    "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(docker:*)",
+      "Bash(kubectl:*)",
+      "Bash(tmux:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(gh:*)",
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(rm:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(cd:*)",
+      "Bash(pwd:*)",
+      "Bash(echo:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)",
+      "Bash(awk:*)",
+      "Bash(xargs:*)",
+      "Bash(find:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash-cut:*",
+      "Bash(tr:*)",
+      "Bash(base64:*)",
+      "Bash(jq:*)",
+      "Bash(yq:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(convert:*)",
+      "Bash(file:*)",
+      "Bash(stat:*)",
+      "Bash-du:*",
+      "Bash(df:*)",
+      "Bash(ps:*)",
+      "Bash(kill:*)",
+      "Bash(pkill:*)",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "mcp__claude-in-chrome__*",
+      "mcp__miyabi-mcp-bundle__*",
+      "mcp__craft__*",
+      "mcp__notion__*",
+      "mcp__discord__*",
+      "mcp__gemini-image-generation__*",
+      "mcp__gemini__*",
+      "mcp__zai-mcp-server__*",
+      "mcp__zread__*",
+      "mcp__web-reader__*",
+      "mcp__web_search_prime__*"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/skills/githubops-workflow/hooks/session-start.sh"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/recovery/auto-recover.sh || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/skills/githubops-workflow/hooks/user-prompt-submit.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/skills/githubops-workflow/hooks/pre-tool-use.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/claude-narrate.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-master.sh"
+  },
+  "language": "Miyabi society",
+  "mcpServers": {
+    "miyabi-mcp-bundle": {
+      "command": "miyabi-mcp",
+      "args": [],
+      "env": {
+        "MIYABI_REPO_PATH": "/Users/shunsukehayashi/dev",
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "craft": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-craft"
+      ]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/shunsukehayashi/dev"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "hello_mcp": {
+      "command": "/Users/shunsukehayashi/.local/bin/uv",
+      "args": [
+        "run",
+        "--script",
+        "/Users/shunsukehayashi/dev/hello_mcp/server.py"
+      ]
+    },
+    "analytics-mcp": {
+      "command": "pipx",
+      "args": [
+        "run",
+        "analytics-mcp"
+      ],
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "${HOME}/.config/gcloud/application_default_credentials.json",
+        "GOOGLE_CLOUD_PROJECT": "miyabi-476308",
+        "GOOGLE_API_KEY": "${GOOGLE_API_KEY}"
+      }
+    },
+    "slack": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "markov-slack-mcp"
+      ],
+      "env": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
+      }
+    },
+    "n8n-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "n8n-mcp"
+      ],
+      "env": {
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "error",
+        "DISABLE_CONSOLE_OUTPUT": "true",
+        "N8N_API_URL": "http://localhost:5678",
+        "N8N_API_KEY": "${N8N_API_KEY}"
+      }
+    },
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres"
+      ],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "postgresql://localhost:5432"
+      }
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-brave-search"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      }
+    },
+    "gemini": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-gemini"
+      ],
+      "env": {
+        "GOOGLE_API_KEY": "${GOOGLE_API_KEY}"
+      }
+    }
+  },
+  "skills": {
+    "git-operations": {
+      "path": "/Users/shunsukehayashi/dev/miyabi-mcp-bundle/.claude/skills/git-operations",
+      "enabled": true
+    },
+    "github-integration": {
+      "path": "/Users/shunsukehayashi/dev/miyabi-mcp-bundle/.claude/skills/github-integration",
+      "enabled": true
+    },
+    "docker-management": {
+      "path": "/Users/shunsukehayashi/dev/miyabi-mcp-bundle/.claude/skills/docker-management",
+      "enabled": true
+    },
+    "system-monitoring": {
+      "path": "/Users/shunsukehayashi/dev/miyabi-mcp-bundle/.claude/skills/system-monitoring",
+      "enabled": true
+    },
+    "network-diagnostics": {
+      "path": "/Users/shunsukehayashi/dev/miyabi-mcp-bundle/.claude/skills/network-diagnostics",
+      "enabled": true
+    },
+    "kubernetes-operations": {
+      "path": "/Users/shunsukehayashi/dev/miyabi-mcp-bundle/.claude/skills/kubernetes-operations",
+      "enabled": true
+    },
+    "log-analysis": {
+      "path": "/Users/shunsukehayashi/dev/miyabi-mcp-bundle/.claude/skills/log-analysis",
+      "enabled": true
+    },
+    "process-management": {
+      "path": "/Users/shunsukehayashi/dev/miyabi-mcp-bundle/.claude/skills/process-management",
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "path": "/Users/shunsukehayashi/dev/miyabi-mcp-bundle/.claude/skills/sequential-thinking",
+      "enabled": true
+    },
+    "voicebox-narrator": {
+      "path": "/Users/shunsukehayashi/.claude/skills/voicebox-narrator",
+      "enabled": true
+    },
+    "pushcut-notifications": {
+      "path": "/Users/shunsukehayashi/.claude/skills/pushcut-notifications",
+      "enabled": true
+    },
+    "ppal-launch": {
+      "path": "/Users/shunsukehayashi/dev/03-products/PPAL/.claude/skills/ppal-launch",
+      "enabled": true
+    },
+    "ppal-lstep": {
+      "path": "/Users/shunsukehayashi/dev/03-products/PPAL/.claude/skills/ppal-lstep",
+      "enabled": true
+    },
+    "teachable-setup": {
+      "path": "/Users/shunsukehayashi/dev/03-products/PPAL/.claude/skills/teachable-setup",
+      "enabled": true
+    },
+    "content-generator": {
+      "path": "/Users/shunsukehayashi/dev/03-products/PPAL/.claude/skills/content-generator",
+      "enabled": true
+    }
+  },
+  "rules": {
+    "autoLoad": [
+      "githubops-mandatory",
+      "agent-orchestration",
+      "daily-operations",
+      "reporting-format",
+      "code-style",
+      "git-commit",
+      "security",
+      "pre-flight-check"
+    ]
+  },
+  "agents": {
+    "autoLoad": [
+      "githubops-agent"
+    ]
+  }
+}
